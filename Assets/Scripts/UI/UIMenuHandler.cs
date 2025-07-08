@@ -9,11 +9,12 @@ using UnityEditor;
 
 public class UIMenuHandler : MonoBehaviour
 {
-    public TextMeshProUGUI nameText;
+    public TMP_InputField nameText;
 
     private void Start()
     {
-        nameText.text = DataManager.Data.Name;
+        if (DataManager.Data.HasName)
+            nameText.text = DataManager.Data.Name;
     }
 
     public void GoToMainScene()
@@ -30,8 +31,8 @@ public class UIMenuHandler : MonoBehaviour
 #endif
     }
 
-    public void OnEndEdit()
+    public void OnEndEdit(string playerName)
     {
-        DataManager.Data.Name = GetComponent<InputField>().text;
+        DataManager.Data.Name = playerName;
     }
 }

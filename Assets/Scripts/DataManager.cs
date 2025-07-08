@@ -1,5 +1,7 @@
 using System.IO;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class DataManager : MonoBehaviour
@@ -19,6 +21,7 @@ public class DataManager : MonoBehaviour
         }
         
         _instance = this;
+        _data = new GameData();
         DontDestroyOnLoad(gameObject);
         LoadData();
     }
@@ -26,38 +29,98 @@ public class DataManager : MonoBehaviour
     [Serializable]
     public class GameData
     {
-        public string name;
-        public int score;
+        public string jsonName;
+        public int[] jsonHighScore;
+        public string[] jsonHighScoreNames;
+        
+        internal Dictionary<string, int> HighScoreDict;
+        
+        public GameData()
+        {
+            jsonName = "Player";
+            jsonHighScore = null;
+            jsonHighScoreNames = null;
+            HighScoreDict = new Dictionary<string, int>();
+        }
+        
+        public GameData(GameData data)
+        {
+            jsonName = data.jsonName;
+            jsonHighScore = data.jsonHighScore;
+            jsonHighScoreNames = data.jsonHighScoreNames;
+            
+            PoolDictionary();
+        }
 
         public string Name
         {
-            get => name;
+            get => jsonName;
             set
             {
-                name = value;
+                jsonName = value;
+                if (!HighScoreDict.TryAdd(jsonName, 0))
+                    HighScoreDict[jsonName] = 0;
+                else
+                {
+                    SaveData();
+                }
+            }
+        }
+
+        public int HighScore
+        {
+            get => HighScoreDict.Values.Prepend(0).Max();
+            set
+            {
+                if (!HasName) return;
+                
+                // if the new score is higher than the old one, we update the high score
+                if (!HighScoreDict.TryAdd(jsonName, value))
+                    HighScoreDict[jsonName] = Math.Max(value, HighScoreDict[jsonName]);
+
+                UpdateArrays();
                 SaveData();
             }
         }
 
-        public int Score
+        internal string GetHighScoreName
         {
-            get => score;
-            set
+            get
             {
-                score = value;
-                SaveData();
+                var highestScore = HighScoreDict.Values.Prepend(0).Max();
+                return HighScoreDict.First(x => x.Value == highestScore).Key;
             }
         }
+
+        internal void PoolDictionary()
+        {
+            HighScoreDict = new Dictionary<string, int>();
+            foreach (var key in jsonHighScoreNames)
+            {
+                HighScoreDict.Add(key, jsonHighScore[Array.IndexOf(jsonHighScoreNames, key)]);
+            }
+        }
+
+        internal void UpdateArrays()
+        {
+            jsonHighScoreNames = new string[HighScoreDict.Count];
+            jsonHighScore = new int[HighScoreDict.Count];
+            var i = 0;
+            foreach (var key in HighScoreDict.Keys)
+            {
+                jsonHighScoreNames[i] = key;
+                jsonHighScore[i] = HighScoreDict[key];
+                i++;
+            }
+        }
+        
+        internal bool HasName => jsonName != "Player";
     }
 
     internal static GameData Data
     {
         get => _instance._data;
-        set
-        {
-            _instance._data = value;
-            SaveData();
-        }
+        set => _instance._data = value;
     }
 
     private static void SaveData()
@@ -75,6 +138,6 @@ public class DataManager : MonoBehaviour
         }
         
         var json = File.ReadAllText(Path);
-        Data = JsonUtility.FromJson<GameData>(json);
+        Data = new GameData(JsonUtility.FromJson<GameData>(json));
     }
 }
